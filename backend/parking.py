@@ -4,7 +4,6 @@ import json
 import random
 from typing import Optional
 
-import streamlit as st
 
 from utils import get_env_path, norm_plate
 
@@ -70,20 +69,4 @@ def free_random_occupied(spots: list[Optional[str]]) -> tuple[list[Optional[str]
     spots2[idx] = None
     return spots2, idx
 
-
-def render_parking_grid(spots: list[Optional[str]]):
-    st.subheader("Estacionamento (30 vagas: 3 fileiras × 10)")
-    occupied = sum(1 for s in spots if s)
-    st.caption(f"Ocupadas: {occupied}/30 | Livres: {30 - occupied}/30")
-
-    for row in range(3):
-        cols = st.columns(10)
-        for col in range(10):
-            i = row * 10 + col
-            plate = spots[i]
-            label = f"V{(i+1):02d}"
-            if plate:
-                cols[col].markdown(f"🔴 **{label}**  \n`{plate}`")
-            else:
-                cols[col].markdown(f"🟢 **{label}**  \nLivre")
 

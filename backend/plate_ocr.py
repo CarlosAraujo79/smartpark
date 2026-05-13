@@ -182,7 +182,7 @@ def ocr_tesseract(img: np.ndarray, psm: int = 7, lang: str = "eng") -> str:
     return "".join(ch for ch in text.upper() if ch.isalnum())
 
 
-def ocr_gemini(crop_bgr: np.ndarray, api_key: str, model_name: str = "gemini-2.5-flash") -> str:
+def ocr_gemini(crop_bgr: np.ndarray, api_key: str, model_name: str = "gemini-2.0-flash") -> str:
     cv2 = _import_cv2()
     Image = _import_pil_image()
     try:

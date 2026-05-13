@@ -1,9 +1,10 @@
+fastapi
+uvicorn[standard]
 ultralytics
 opencv-python-headless
 pytesseract
 Pillow
 numpy
 google-generativeai
-streamlit
-streamlit-webrtc
-av
+python-multipart
+python-dotenv

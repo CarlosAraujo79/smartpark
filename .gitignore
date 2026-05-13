@@ -1,6 +1,33 @@
-.venv/
-__pycache__/
+# ─── Python / Backend ─────────────────────────────
+backend/.venv/
+backend/__pycache__/
+backend/*.pyc
+backend/*.pyo
+backend/*.egg-info/
+backend/dist/
+backend/build/
+backend/.eggs/
 *.pyc
-outputs/
-.streamlit/secrets.toml
+*.pyo
+__pycache__/
 
+# ─── Frontend ─────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# ─── Dados e Saídas ───────────────────────────────
+backend/outputs/
+backend/parking_state.json
+
+# ─── Streamlit (legado — removido) ──────────────────────
+# backend/.streamlit/
+
+# ─── Variáveis de Ambiente ───────────────────────────────
+backend/.env
+
+# ─── Editor / OS ──────────────────────────────────
+.DS_Store
+.env
+.env.local
+*.log

@@ -1,115 +1,99 @@
-# Placas (detecção + OCR)
+# 🚗 SmartPark — Sistema de Controle de Estacionamento Inteligente
 
-Este projeto usa seu modelo `.pt` (YOLO via `ultralytics`) para **detectar a placa na imagem**, recortar (crop) a região e depois fazer OCR via:
+O **SmartPark** é uma solução completa de monitoramento e controle de acesso veicular baseada em Visão Computacional. O sistema utiliza modelos de Deep Learning (YOLO) e mecanismos híbridos de OCR para identificar placas e gerenciar vagas de estacionamento em tempo real.
 
-- **Tesseract** (offline, rápido, sem custos)
-- **Gemini 2.5 Flash** (online, costuma ler melhor em condições ruins)
+---
 
-## Requisitos
+## 🏗️ Arquitetura do Sistema
 
-### Python deps
+O projeto foi migrado de uma arquitetura legada (Streamlit) para um stack moderno full-stack:
 
-Para o Streamlit Cloud, use `opencv-python-headless` (já está em `requirements.txt`).
+- **Frontend**: React 19 + Vite + CSS Vanilla (Design Premium/Glassmorphism)
+- **Backend**: FastAPI (Python 3.10+)
+- **IA/Visão**: 
+  - **Detecção**: YOLOv8 (modelo customizado `plaquinhas.pt`)
+  - **OCR Local**: Tesseract OCR
+  - **OCR Nuvem**: Google Gemini 2.5 Flash (Vision API)
+- **Automação**: Shell Script (`start.sh`) para orquestração de serviços.
 
-No Ubuntu/Debian, instale o suporte a venv:
+---
 
-```bash
-sudo apt-get update
-sudo apt-get install -y python3-venv
-```
+## 🚀 Como Iniciar
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
+### Pré-requisitos
+- Python 3.10 ou superior
+- Node.js (npm)
+- Tesseract OCR instalado no sistema (`sudo apt install tesseract-ocr`)
 
-### Tesseract (para OCR offline)
-
-Ubuntu/Debian:
-
-```bash
-sudo apt-get update
-sudo apt-get install -y tesseract-ocr
-```
-
-## Uso
-
-## Interface (recomendado)
-
-Rode a interface:
+### Execução Rápida
+O sistema possui um script automatizado que configura o ambiente virtual, instala dependências e inicia ambos os serviços:
 
 ```bash
-streamlit run app.py
+chmod +x start.sh
+./start.sh
 ```
 
-### Configurar a API key (sem colocar na tela)
+- **Frontend**: `http://localhost:5173`
+- **Backend API**: `http://localhost:8000`
+- **Documentação API (Swagger)**: `http://localhost:8000/docs`
 
-Opção A (recomendado no Streamlit): crie `.streamlit/secrets.toml` a partir do exemplo:
+---
 
-```bash
-mkdir -p .streamlit
-cp .streamlit/secrets.toml.example .streamlit/secrets.toml
+## ⚙️ Configuração do Gemini Vision
+
+Para utilizar o OCR de alta precisão via Google Gemini:
+1. Obtenha uma chave em [Google AI Studio](https://aistudio.google.com/).
+2. Edite o arquivo `backend/.env`:
+   ```env
+   GEMINI_API_KEY="SUA_CHAVE_AQUI"
+   GEMINI_MODEL_NAME="gemini-2.5-flash"
+   ```
+
+---
+
+## 📖 Guia de Uso
+
+### 1. Dashboard (Painel Principal)
+- **Visão Geral**: Acompanhe o status das vagas (ocupadas vs. livres).
+- **Mapa de Vagas**: Visualização gráfica do estacionamento. Clique em "Liberar Aleatório" para simular a saída de um veículo.
+- **Últimas Detecções**: Log rápido dos eventos mais recentes.
+
+### 2. Câmera / Detecção
+- **Modo Webcam**: Use a câmera do dispositivo para capturar placas em tempo real.
+- **Modo Imagem**: Faça upload de fotos de veículos para análise.
+- **Processamento**: O sistema executa automaticamente o modelo YOLO para localizar a placa e, em seguida, utiliza os motores Tesseract e Gemini simultaneamente para extrair o texto.
+- **Resultado**: Exibe a placa detectada, o nível de confiança e se o acesso foi liberado (baseado na Whitelist).
+
+### 3. Lista de Acesso (Whitelist)
+- Gerencie as placas autorizadas a entrar no estacionamento.
+- Adicione novas placas ou remova as existentes. 
+- O sistema reconhece tanto o formato antigo (ABC-1234) quanto o padrão Mercosul.
+
+### 4. Histórico
+- Registro detalhado de todas as tentativas de acesso, incluindo horário, placa, imagem processada (bbox) e o resultado da autorização.
+
+---
+
+## 🛠️ Estrutura de Pastas
+
+```text
+placas_tcc/
+├── backend/          # Servidor FastAPI e Lógica de IA
+│   ├── .env          # Variáveis sensíveis (API Keys)
+│   ├── api.py        # Endpoints da API
+│   ├── plate_ocr.py  # Integração YOLO + OCR
+│   ├── parking.py    # Lógica de gestão de vagas
+│   └── plaquinhas.pt # Modelo YOLO treinado
+├── frontend/         # Interface React
+│   ├── src/
+│   │   ├── components/ # Componentes da UI
+│   │   └── assets/     # Logos e imagens
+│   └── index.html
+├── start.sh          # Script de inicialização unificado
+└── README.md         # Esta documentação
 ```
 
-Edite `.streamlit/secrets.toml` e coloque sua chave em `GEMINI_API_KEY`.
+---
 
-Opção B: variável de ambiente:
-
-```bash
-export GEMINI_API_KEY="SUA_CHAVE_AQUI"
-```
-
-A interface faz:
-- detecção da placa (bbox + crop)
-- OCR com **Tesseract e Gemini ao mesmo tempo**
-- se um OCR falhar, aparece só um **aviso** e o outro continua
-- detecção em **vídeo (upload)** com geração de vídeo anotado para download
-- simulação de **estacionamento**: libera/bloqueia se a placa lida estiver na whitelist
-- mapa visual de **30 vagas (3×10)** com “luzes” (🟢 livre / 🔴 ocupada) e preenchimento aleatório a cada carro liberado
-- detecção por **câmera do dispositivo** (tirar foto na interface)
-- detecção por **câmera ao vivo (auto)** com intervalo entre leituras
-
-### 1) Detectar placa + OCR com Tesseract
-
-```bash
-python3 plate_ocr.py --image /caminho/para/imagem.jpg --model plaquinhas.pt --ocr tesseract --save-debug
-```
-
-Visual (abre janelas com bbox/crop):
-
-```bash
-python3 plate_ocr.py --image /caminho/para/imagem.jpg --model plaquinhas.pt --ocr tesseract --show
-```
-
-Saídas (se `--save-debug`):
-- `outputs/boxed.jpg`: imagem com bbox
-- `outputs/crop.jpg`: recorte da placa
-- `outputs/crop_preproc.png`: pré-processamento usado no OCR
-
-### 2) Detectar placa + OCR com Gemini 2.5 Flash
-
-Defina sua chave:
-
-```bash
-export GEMINI_API_KEY="SUA_CHAVE_AQUI"
-```
-
-Rode:
-
-```bash
-python3 plate_ocr.py --image /caminho/para/imagem.jpg --model plaquinhas.pt --ocr gemini --save-debug
-```
-
-Visual:
-
-```bash
-python3 plate_ocr.py --image /caminho/para/imagem.jpg --model plaquinhas.pt --ocr gemini --show
-```
-
-## Dicas rápidas
-
-- Se estiver detectando mas cortando “apertado”, aumente `--pad` (ex: `--pad 0.15`).
-- Se estiver perdendo detecção, reduza `--conf` (ex: `--conf 0.15`).
-- Se tiver GPU, tente `--device 0`.
-
+## 📄 Licença
+Este projeto foi desenvolvido para fins acadêmicos (TCC).
