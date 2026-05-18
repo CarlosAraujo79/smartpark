@@ -108,10 +108,6 @@ export default function MonitorPage({ onResult, addToast }) {
       try {
         const data = JSON.parse(e.data);
         setPlateResult(data);
-        if (data.detected && data.authorized) {
-          onResult(data);
-          addToast(`Acesso liberado! Placa: ${data.plate} — Vaga ${(data.spot_assigned ?? 0) + 1}`, 'success');
-        }
       } catch (_) {}
     };
 
@@ -167,6 +163,24 @@ export default function MonitorPage({ onResult, addToast }) {
     }
   }, [plateCamId, faceCamId, areaCamId, addToast, onResult]);
 
+  // ─── Lógica de Portaria (Multi-Condição) ─────────────────────────────────
+  const [lastGrantedPlate, setLastGrantedPlate] = useState(null);
+
+  useEffect(() => {
+    if (!plateResult || !faceResult || !areaResult) return;
+
+    const plateOk = plateResult.detected && plateResult.authorized;
+    const faceOk  = faceResult.detected && faceResult.authorized;
+    const areaOk  = areaResult.detected && areaResult.clear;
+
+    // Se as 3 condições forem satisfeitas e ainda não liberamos esta placa
+    if (plateOk && faceOk && areaOk && plateResult.plate !== lastGrantedPlate) {
+      setLastGrantedPlate(plateResult.plate);
+      onResult(plateResult);
+      addToast(`Acesso Liberado! Placa: ${plateResult.plate} | Condutor: ${faceResult.person}`, 'success');
+    }
+  }, [plateResult, faceResult, areaResult, lastGrantedPlate, onResult, addToast]);
+
   // ─── Stop monitoring ──────────────────────────────────────────────────────
   const stopMonitoring = useCallback(() => {
     clearInterval(intervalRef.current);
@@ -179,6 +193,7 @@ export default function MonitorPage({ onResult, addToast }) {
     setPlateResult(null);
     setFaceResult(null);
     setAreaResult(null);
+    setLastGrantedPlate(null);
   }, []);
 
   // Cleanup on unmount
