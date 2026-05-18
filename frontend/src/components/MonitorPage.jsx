@@ -55,13 +55,15 @@ export default function MonitorPage({ onResult, addToast }) {
 
   const [isRunning,    setIsRunning]    = useState(false);
   const [plateResult,  setPlateResult]  = useState(null);
-  const [faceResult,   setFaceResult]   = useState(null);  // Phase 2
-  const [areaResult]  = useState(null);                    // Phase 3
+  const [faceResult,   setFaceResult]   = useState(null);
+  const [areaResult,   setAreaResult]   = useState(null);  // Phase 3
 
   const wsPlateRef  = useRef(null);
   const wsFaceRef   = useRef(null);
+  const wsAreaRef   = useRef(null);
   const intervalRef = useRef(null);
   const faceIntervalRef = useRef(null);
+  const areaIntervalRef = useRef(null);
 
   // ─── Enumerate available cameras ──────────────────────────────────────────
   const refreshCameras = useCallback(() => {
@@ -139,17 +141,44 @@ export default function MonitorPage({ onResult, addToast }) {
       wsFace.onerror  = () => addToast('Erro na conexão WebSocket de face.', 'error');
       wsFace.onclose  = () => { clearInterval(faceIntervalRef.current); };
     }
-  }, [plateCamId, faceCamId, addToast, onResult]);
+
+    // ── WebSocket: Área (apenas se câmera selecionada) ───────────────────
+    if (areaCamId) {
+      const wsArea = new WebSocket(`${API_WS}/ws/area`);
+      wsAreaRef.current = wsArea;
+
+      wsArea.onopen = () => {
+        areaIntervalRef.current = setInterval(() => {
+          if (!areaRef.current || wsArea.readyState !== WebSocket.OPEN) return;
+          const shot = areaRef.current.getScreenshot({ width: 640, height: 480 });
+          if (!shot) return;
+          fetch(shot).then(r => r.arrayBuffer()).then(buf => {
+            if (wsArea.readyState === WebSocket.OPEN) wsArea.send(buf);
+          }).catch(() => {});
+        }, FRAME_MS);
+      };
+
+      wsArea.onmessage = (e) => {
+        try { setAreaResult(JSON.parse(e.data)); } catch (_) {}
+      };
+
+      wsArea.onerror  = () => addToast('Erro na conexão WebSocket de área.', 'error');
+      wsArea.onclose  = () => { clearInterval(areaIntervalRef.current); };
+    }
+  }, [plateCamId, faceCamId, areaCamId, addToast, onResult]);
 
   // ─── Stop monitoring ──────────────────────────────────────────────────────
   const stopMonitoring = useCallback(() => {
     clearInterval(intervalRef.current);
     clearInterval(faceIntervalRef.current);
+    clearInterval(areaIntervalRef.current);
     if (wsPlateRef.current) wsPlateRef.current.close();
     if (wsFaceRef.current)  wsFaceRef.current.close();
+    if (wsAreaRef.current)  wsAreaRef.current.close();
     setIsRunning(false);
     setPlateResult(null);
     setFaceResult(null);
+    setAreaResult(null);
   }, []);
 
   // Cleanup on unmount
@@ -276,19 +305,34 @@ export default function MonitorPage({ onResult, addToast }) {
           )}
         </CameraFeed>
 
-        {/* Area Camera — Phase 3 placeholder */}
+        {/* Area Camera — Phase 3: ACTIVE */}
         <CameraFeed
           label="Câmera — Área"
           icon={MapPin}
           color="var(--warning)"
           camId={areaCamId}
           feedRef={areaRef}
-          phaseLabel="FASE 3"
+          isLive={isRunning && !!areaCamId}
         >
-          <div style={{ marginTop: '0.6rem', padding: '0.5rem 0.75rem', background: 'var(--bg-2)',
-            borderRadius: 8, border: '1px solid var(--border)', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-            Detecção de presença na área — YOLOv8n (em desenvolvimento)
-          </div>
+          {areaResult ? (
+            <div style={{ marginTop: '0.6rem', padding: '0.5rem 0.75rem', background: 'var(--bg-2)',
+              borderRadius: 8, border: `1px solid ${areaResult.clear ? 'var(--warning)' : 'var(--danger)'}` }}>
+              <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Status da Área
+              </div>
+              <div style={{ fontWeight: 700, marginTop: '0.1rem', color: areaResult.clear ? 'var(--warning)' : 'var(--danger)' }}>
+                {areaResult.clear ? 'Área Livre' : 'Pessoa Detectada'}
+              </div>
+              <div style={{ fontSize: '0.72rem', marginTop: '0.15rem', color: 'var(--text-muted)' }}>
+                {areaResult.clear ? 'Seguro para abrir' : `${areaResult.person_count} pedestre(s) no portão`}
+              </div>
+            </div>
+          ) : (
+            <div style={{ marginTop: '0.6rem', padding: '0.5rem 0.75rem', background: 'var(--bg-2)',
+              borderRadius: 8, border: '1px solid var(--border)', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+              {isRunning && areaCamId ? 'Aguardando frame de área...' : 'YOLOv8n — selecione uma câmera para ativar'}
+            </div>
+          )}
         </CameraFeed>
 
         {/* Gate Status Panel */}

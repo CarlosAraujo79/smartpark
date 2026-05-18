@@ -17,6 +17,7 @@ from face_recognition_module import (
     recognize_face, register_face_from_image,
     list_faces, remove_face, load_face_db
 )
+from area_detection_module import detect_area
 from parking import (
     load_parking_spots,
     save_parking_spots,
@@ -319,6 +320,45 @@ async def ws_face(websocket: WebSocket):
         logger.info("WS /ws/face: cliente desconectado")
     except Exception as e:
         logger.error(f"WS /ws/face erro: {e}")
+        await websocket.close()
+
+
+# ─── WEBSOCKET: Detecção de Área (Pedestres) ──────────────────────────────────
+
+def _process_area_sync(img_bytes: bytes) -> dict:
+    """Processa um frame de câmera de área — roda em thread pool."""
+    try:
+        nparr   = np.frombuffer(img_bytes, np.uint8)
+        img_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if img_bgr is None:
+            return {"detected": False, "error": "frame_invalido"}
+        return detect_area(img_bgr)
+    except Exception as e:
+        logger.error(f"_process_area_sync erro: {e}")
+        return {"detected": False, "error": str(e)}
+
+
+@app.websocket("/ws/area")
+async def ws_area(websocket: WebSocket):
+    await websocket.accept()
+    logger.info("WS /ws/area: cliente conectado")
+    loop = asyncio.get_running_loop()
+    last_processed = 0.0
+    THROTTLE_SEC   = 0.5  # área pode ser checada a 2 fps
+
+    try:
+        while True:
+            data = await websocket.receive_bytes()
+            now  = time.time()
+            if now - last_processed < THROTTLE_SEC:
+                continue
+            last_processed = now
+            result = await loop.run_in_executor(None, _process_area_sync, data)
+            await websocket.send_json(result)
+    except WebSocketDisconnect:
+        logger.info("WS /ws/area: cliente desconectado")
+    except Exception as e:
+        logger.error(f"WS /ws/area erro: {e}")
         await websocket.close()
 
 
