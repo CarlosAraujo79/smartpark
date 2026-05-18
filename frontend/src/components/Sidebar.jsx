@@ -1,12 +1,13 @@
-import { LayoutDashboard, ShieldCheck, Camera, Activity } from 'lucide-react';
+import { LayoutDashboard, ShieldCheck, Camera, Activity, Monitor } from 'lucide-react';
 
 import logo from '../assets/logo.png';
 
 const navItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={17} /> },
+  { id: 'dashboard', label: 'Dashboard',       icon: <LayoutDashboard size={17} /> },
+  { id: 'monitor',   label: 'Monitoramento',   icon: <Monitor size={17} /> },
   { id: 'camera',    label: 'Câmera / Detecção', icon: <Camera size={17} /> },
   { id: 'whitelist', label: 'Lista de Acesso', icon: <ShieldCheck size={17} /> },
-  { id: 'logs',      label: 'Histórico', icon: <Activity size={17} /> },
+  { id: 'logs',      label: 'Histórico',        icon: <Activity size={17} /> },
 ];
 
 export default function Sidebar({ active, onNavigate, apiOnline }) {

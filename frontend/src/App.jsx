@@ -6,15 +6,17 @@ import Dashboard from './components/Dashboard';
 import CameraPage from './components/CameraPage';
 import WhitelistPage from './components/WhitelistPage';
 import LogsPage from './components/LogsPage';
+import MonitorPage from './components/MonitorPage';
 import ToastContainer from './components/Toast';
 
 const API = 'http://localhost:8000';
 
 const PAGE_TITLES = {
-  dashboard: { title: 'Dashboard', subtitle: 'Visão geral do estacionamento' },
-  camera:    { title: 'Câmera / Detecção', subtitle: 'Capture ou envie uma imagem para detectar placas' },
-  whitelist: { title: 'Lista de Acesso', subtitle: 'Gerencie quais placas têm acesso permitido' },
-  logs:      { title: 'Histórico', subtitle: 'Todas as detecções desta sessão' },
+  dashboard: { title: 'Dashboard',            subtitle: 'Visão geral do estacionamento' },
+  monitor:   { title: 'Monitoramento',         subtitle: 'Detecção contínua com 3 câmeras — placa, rosto e área' },
+  camera:    { title: 'Câmera / Detecção',    subtitle: 'Capture ou envie uma imagem para detectar placas' },
+  whitelist: { title: 'Lista de Acesso',       subtitle: 'Gerencie quais placas têm acesso permitido' },
+  logs:      { title: 'Histórico',             subtitle: 'Todas as detecções desta sessão' },
 };
 
 let toastId = 0;
@@ -112,6 +114,9 @@ export default function App() {
               onFreeSpot={freeSpot}
               loading={freeLoading}
             />
+          )}
+          {page === 'monitor' && (
+            <MonitorPage onResult={handleResult} addToast={addToast} />
           )}
           {page === 'camera' && (
             <CameraPage onResult={handleResult} addToast={addToast} />
