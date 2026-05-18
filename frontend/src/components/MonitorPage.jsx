@@ -55,12 +55,13 @@ export default function MonitorPage({ onResult, addToast }) {
 
   const [isRunning,    setIsRunning]    = useState(false);
   const [plateResult,  setPlateResult]  = useState(null);
-  // Phase 2 & 3 — will be populated in future phases:
-  const [faceResult]  = useState(null);
-  const [areaResult]  = useState(null);
+  const [faceResult,   setFaceResult]   = useState(null);  // Phase 2
+  const [areaResult]  = useState(null);                    // Phase 3
 
-  const wsRef       = useRef(null);
+  const wsPlateRef  = useRef(null);
+  const wsFaceRef   = useRef(null);
   const intervalRef = useRef(null);
+  const faceIntervalRef = useRef(null);
 
   // ─── Enumerate available cameras ──────────────────────────────────────────
   const refreshCameras = useCallback(() => {
@@ -84,27 +85,24 @@ export default function MonitorPage({ onResult, addToast }) {
       return;
     }
 
-    const ws = new WebSocket(`${API_WS}/ws/plate`);
-    wsRef.current = ws;
+    // ── WebSocket: Placa ──────────────────────────────────────────────────
+    const wsPlate = new WebSocket(`${API_WS}/ws/plate`);
+    wsPlateRef.current = wsPlate;
 
-    ws.onopen = () => {
+    wsPlate.onopen = () => {
       addToast('Monitoramento contínuo iniciado.', 'success');
-
       intervalRef.current = setInterval(() => {
-        if (!plateRef.current || ws.readyState !== WebSocket.OPEN) return;
+        if (!plateRef.current || wsPlate.readyState !== WebSocket.OPEN) return;
         const shot = plateRef.current.getScreenshot({ width: 640, height: 480 });
         if (!shot) return;
-
-        fetch(shot)
-          .then(r => r.arrayBuffer())
-          .then(buf => { if (ws.readyState === WebSocket.OPEN) ws.send(buf); })
-          .catch(() => {});
+        fetch(shot).then(r => r.arrayBuffer()).then(buf => {
+          if (wsPlate.readyState === WebSocket.OPEN) wsPlate.send(buf);
+        }).catch(() => {});
       }, FRAME_MS);
-
       setIsRunning(true);
     };
 
-    ws.onmessage = (e) => {
+    wsPlate.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data);
         setPlateResult(data);
@@ -115,19 +113,43 @@ export default function MonitorPage({ onResult, addToast }) {
       } catch (_) {}
     };
 
-    ws.onerror = () => addToast('Erro na conexão WebSocket com o backend.', 'error');
-    ws.onclose = () => {
-      clearInterval(intervalRef.current);
-      setIsRunning(false);
-    };
-  }, [plateCamId, addToast, onResult]);
+    wsPlate.onerror = () => addToast('Erro na conexão WebSocket de placas.', 'error');
+    wsPlate.onclose = () => { clearInterval(intervalRef.current); };
+
+    // ── WebSocket: Rosto (apenas se câmera selecionada) ──────────────────
+    if (faceCamId) {
+      const wsFace = new WebSocket(`${API_WS}/ws/face`);
+      wsFaceRef.current = wsFace;
+
+      wsFace.onopen = () => {
+        faceIntervalRef.current = setInterval(() => {
+          if (!faceRef.current || wsFace.readyState !== WebSocket.OPEN) return;
+          const shot = faceRef.current.getScreenshot({ width: 320, height: 240 });
+          if (!shot) return;
+          fetch(shot).then(r => r.arrayBuffer()).then(buf => {
+            if (wsFace.readyState === WebSocket.OPEN) wsFace.send(buf);
+          }).catch(() => {});
+        }, FRAME_MS * 1.5); // face é mais pesado, intervalo maior
+      };
+
+      wsFace.onmessage = (e) => {
+        try { setFaceResult(JSON.parse(e.data)); } catch (_) {}
+      };
+
+      wsFace.onerror  = () => addToast('Erro na conexão WebSocket de face.', 'error');
+      wsFace.onclose  = () => { clearInterval(faceIntervalRef.current); };
+    }
+  }, [plateCamId, faceCamId, addToast, onResult]);
 
   // ─── Stop monitoring ──────────────────────────────────────────────────────
   const stopMonitoring = useCallback(() => {
     clearInterval(intervalRef.current);
-    if (wsRef.current) wsRef.current.close();
+    clearInterval(faceIntervalRef.current);
+    if (wsPlateRef.current) wsPlateRef.current.close();
+    if (wsFaceRef.current)  wsFaceRef.current.close();
     setIsRunning(false);
     setPlateResult(null);
+    setFaceResult(null);
   }, []);
 
   // Cleanup on unmount
@@ -218,19 +240,40 @@ export default function MonitorPage({ onResult, addToast }) {
           <PlateResultBlock />
         </CameraFeed>
 
-        {/* Face Camera — Phase 2 placeholder */}
+        {/* Face Camera — Phase 2: ACTIVE */}
         <CameraFeed
           label="Câmera — Rosto"
           icon={User}
           color="var(--blue)"
           camId={faceCamId}
           feedRef={faceRef}
-          phaseLabel="FASE 2"
+          isLive={isRunning && !!faceCamId}
         >
-          <div style={{ marginTop: '0.6rem', padding: '0.5rem 0.75rem', background: 'var(--bg-2)',
-            borderRadius: 8, border: '1px solid var(--border)', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-            Reconhecimento facial — InsightFace (em desenvolvimento)
-          </div>
+          {faceResult ? (
+            <div style={{ marginTop: '0.6rem', padding: '0.5rem 0.75rem', background: 'var(--bg-2)',
+              borderRadius: 8, border: `1px solid ${faceResult.authorized ? 'var(--blue)' : faceResult.detected ? 'var(--danger)' : 'var(--border)'}` }}>
+              {faceResult.detected ? (
+                <>
+                  <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Rosto detectado</div>
+                  <div style={{ fontWeight: 700, marginTop: '0.1rem' }}>
+                    {faceResult.authorized ? faceResult.person : 'Não reconhecido'}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', marginTop: '0.15rem',
+                    color: faceResult.authorized ? 'var(--blue)' : 'var(--danger)' }}>
+                    {faceResult.authorized ? 'Autorizado' : 'Não autorizado'}
+                    {faceResult.confidence ? ` · ${(faceResult.confidence * 100).toFixed(0)}%` : ''}
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Nenhum rosto no frame</div>
+              )}
+            </div>
+          ) : (
+            <div style={{ marginTop: '0.6rem', padding: '0.5rem 0.75rem', background: 'var(--bg-2)',
+              borderRadius: 8, border: '1px solid var(--border)', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+              {isRunning && faceCamId ? 'Aguardando frame de rosto...' : 'InsightFace — selecione uma câmera para ativar'}
+            </div>
+          )}
         </CameraFeed>
 
         {/* Area Camera — Phase 3 placeholder */}

@@ -13,6 +13,10 @@ from typing import List, Optional
 from plate_ocr import detect_best_plate, _pad_xyxy, preprocess_for_ocr, ocr_tesseract, ocr_gemini, _import_cv2
 from utils import norm_plate
 from whitelist import load_allowed_plates, save_allowed_plates
+from face_recognition_module import (
+    recognize_face, register_face_from_image,
+    list_faces, remove_face, load_face_db
+)
 from parking import (
     load_parking_spots,
     save_parking_spots,
@@ -237,6 +241,84 @@ async def ws_plate(websocket: WebSocket):
         logger.info("WS /ws/plate: cliente desconectado")
     except Exception as e:
         logger.error(f"WS /ws/plate erro: {e}")
+        await websocket.close()
+
+
+# ─── FACES: Endpoints REST ────────────────────────────────────────────────────
+
+@app.get("/faces")
+async def get_faces():
+    """Lista todos os rostos cadastrados."""
+    db = load_face_db()
+    return {"faces": [{"name": f["name"]} for f in db]}
+
+
+@app.post("/faces")
+async def register_face(
+    file: UploadFile = File(...),
+    name: str        = Form(...)
+):
+    """Cadastra um novo rosto a partir de uma imagem."""
+    contents = await file.read()
+    nparr    = np.frombuffer(contents, np.uint8)
+    img_bgr  = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+    if img_bgr is None:
+        raise HTTPException(status_code=400, detail="Imagem inválida")
+    if not name.strip():
+        raise HTTPException(status_code=400, detail="Nome não pode ser vazio")
+
+    result = register_face_from_image(img_bgr, name.strip())
+    if not result["success"]:
+        raise HTTPException(status_code=422, detail=result["message"])
+    return result
+
+
+@app.delete("/faces/{name}")
+async def delete_face(name: str):
+    """Remove um rosto pelo nome."""
+    removed = remove_face(name)
+    if not removed:
+        raise HTTPException(status_code=404, detail=f"Rosto '{name}' não encontrado")
+    return {"status": "removed", "name": name}
+
+
+# ─── WEBSOCKET: Reconhecimento Facial Contínuo ────────────────────────────────
+
+def _process_face_sync(img_bytes: bytes) -> dict:
+    """Processa um frame de câmera facial — roda em thread pool."""
+    try:
+        nparr   = np.frombuffer(img_bytes, np.uint8)
+        img_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if img_bgr is None:
+            return {"detected": False, "error": "frame_invalido"}
+        return recognize_face(img_bgr)
+    except Exception as e:
+        logger.error(f"_process_face_sync erro: {e}")
+        return {"detected": False, "error": str(e)}
+
+
+@app.websocket("/ws/face")
+async def ws_face(websocket: WebSocket):
+    await websocket.accept()
+    logger.info("WS /ws/face: cliente conectado")
+    loop = asyncio.get_running_loop()
+    last_processed = 0.0
+    THROTTLE_SEC   = 0.8  # reconhecimento facial é mais pesado; máx ~1.2 fps
+
+    try:
+        while True:
+            data = await websocket.receive_bytes()
+            now  = time.time()
+            if now - last_processed < THROTTLE_SEC:
+                continue
+            last_processed = now
+            result = await loop.run_in_executor(None, _process_face_sync, data)
+            await websocket.send_json(result)
+    except WebSocketDisconnect:
+        logger.info("WS /ws/face: cliente desconectado")
+    except Exception as e:
+        logger.error(f"WS /ws/face erro: {e}")
         await websocket.close()
 
 

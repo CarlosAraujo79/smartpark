@@ -8,3 +8,5 @@ numpy
 google-generativeai
 python-multipart
 python-dotenv
+insightface==0.7.3
+onnxruntime==1.23.2

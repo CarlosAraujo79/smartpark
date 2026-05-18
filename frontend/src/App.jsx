@@ -7,6 +7,7 @@ import CameraPage from './components/CameraPage';
 import WhitelistPage from './components/WhitelistPage';
 import LogsPage from './components/LogsPage';
 import MonitorPage from './components/MonitorPage';
+import FaceWhitelistPage from './components/FaceWhitelistPage';
 import ToastContainer from './components/Toast';
 
 const API = 'http://localhost:8000';
@@ -16,6 +17,7 @@ const PAGE_TITLES = {
   monitor:   { title: 'Monitoramento',         subtitle: 'Detecção contínua com 3 câmeras — placa, rosto e área' },
   camera:    { title: 'Câmera / Detecção',    subtitle: 'Capture ou envie uma imagem para detectar placas' },
   whitelist: { title: 'Lista de Acesso',       subtitle: 'Gerencie quais placas têm acesso permitido' },
+  faces:     { title: 'Condutores',            subtitle: 'Cadastre os rostos autorizados a entrar no estacionamento' },
   logs:      { title: 'Histórico',             subtitle: 'Todas as detecções desta sessão' },
 };
 
@@ -120,6 +122,9 @@ export default function App() {
           )}
           {page === 'camera' && (
             <CameraPage onResult={handleResult} addToast={addToast} />
+          )}
+          {page === 'faces' && (
+            <FaceWhitelistPage addToast={addToast} />
           )}
           {page === 'whitelist' && (
             <WhitelistPage

@@ -1,4 +1,4 @@
-import { LayoutDashboard, ShieldCheck, Camera, Activity, Monitor } from 'lucide-react';
+import { LayoutDashboard, ShieldCheck, Camera, Activity, Monitor, Users } from 'lucide-react';
 
 import logo from '../assets/logo.png';
 
@@ -7,6 +7,7 @@ const navItems = [
   { id: 'monitor',   label: 'Monitoramento',   icon: <Monitor size={17} /> },
   { id: 'camera',    label: 'Câmera / Detecção', icon: <Camera size={17} /> },
   { id: 'whitelist', label: 'Lista de Acesso', icon: <ShieldCheck size={17} /> },
+  { id: 'faces',     label: 'Condutores',      icon: <Users size={17} /> },
   { id: 'logs',      label: 'Histórico',        icon: <Activity size={17} /> },
 ];
 
